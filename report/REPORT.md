@@ -2,8 +2,8 @@
 
 ## 1. Thông tin sinh viên và cấu hình
 
-- Họ tên:
-- Mã sinh viên:
+- Họ tên: Nguyễn Quang Tuấn
+- Mã sinh viên: 2A202602470
 
 - Nhà cung cấp và mô hình: Ollama Cloud, endpoint tương thích OpenAI (`LAB_BASE_URL=https://ollama.com/v1`), `LAB_MODEL=gpt-oss:120b`; `LAB_TEMPERATURE=0`; `recursion_limit=60` (mặc định của `lab.runner`) cho mọi lần chạy chính thức.
 - Deep Agents 0.7.21, Python 3.12, Linux; chạy trực tiếp (không Docker), sandbox là thư mục tạm.
