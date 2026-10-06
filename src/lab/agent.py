@@ -3,13 +3,17 @@
 Pseudo-code: guides/pseudocode/01_agent.md
 Kiểm tra:    pytest tests/test_02_agent.py
 """
+import sys
 from pathlib import Path
 
-# TODO 1: import các thành phần cần dùng, ví dụ:
-#   from deepagents import create_deep_agent
-#   from deepagents.backends import LocalShellBackend
-#   from .model import make_model
-#   from .subagents import get_subagents
+import openai
+from deepagents import create_deep_agent
+from deepagents.backends import LocalShellBackend
+from langchain.agents.middleware import ModelRetryMiddleware
+from langchain_core.tools import tool
+
+from .model import make_model
+from .subagents import get_subagents
 
 # ---- CÓ SẴN, KHÔNG SỬA: system prompt dùng chung cho mọi sinh viên (để đường cơ sở so sánh được) ----
 PATHS_NOTE = (
@@ -38,6 +42,35 @@ SUBAGENTS_NOTE = (
 # --------------------------------------------------------------------------------------------------
 
 
+def _is_transient_api_error(exc: Exception) -> bool:
+    """Server-side failures of the model API (5xx, rate limit, network): infrastructure, not agent behaviour."""
+    if isinstance(exc, openai.APIStatusError):
+        return exc.status_code >= 500 or exc.status_code == 429
+    return isinstance(exc, (openai.APIConnectionError, openai.APITimeoutError))
+
+
+def _retry_middleware():
+    # The OpenAI client already retries twice; this adds a longer back-off for flaky hosted endpoints.
+    return ModelRetryMiddleware(max_retries=5, retry_on=_is_transient_api_error, on_failure="error",
+                                initial_delay=5.0, max_delay=60.0)
+
+
+def _exec_alias(backend):
+    """gpt-oss is trained with a built-in `exec` shell tool and keeps calling it even when only `execute` is offered;
+    the hosted endpoint answers such an unknown tool call with HTTP 500. This alias forwards it to the same backend."""
+    @tool("exec")
+    def exec_(cmd: list[str] | str) -> str:
+        """Alias of `execute`: run a shell command in the sandbox root. `cmd` is an argv list or a command string."""
+        if isinstance(cmd, list):
+            if len(cmd) >= 3 and cmd[0] in ("bash", "sh", "/bin/bash", "/bin/sh") and cmd[1] in ("-c", "-lc"):
+                cmd = cmd[2]
+            else:
+                cmd = " ".join(cmd)
+        r = backend.execute(cmd)
+        return f"{r.output}\n[exit code {r.exit_code}]"
+    return exec_
+
+
 def make_backend(sandbox: Path):
     """Tạo backend (môi trường thực thi) cho tác tử.
 
@@ -47,7 +80,12 @@ def make_backend(sandbox: Path):
       - Tác tử chạy được lệnh shell và gọi được `python` (cần đặt PATH).
       - KHÔNG chuyển biến môi trường của bạn vào shell của tác tử (khóa API không được lộ).
     """
-    raise NotImplementedError("TODO 2: cài đặt make_backend (xem guides/pseudocode/01_agent.md)")
+    env = {
+        "PATH": str(Path(sys.executable).parent) + ":/usr/local/bin:/usr/bin:/bin",
+        "HOME": str(sandbox),
+        "PYTHONDONTWRITEBYTECODE": "1",
+    }
+    return LocalShellBackend(root_dir=sandbox, virtual_mode=True, inherit_env=False, env=env, timeout=120)
 
 
 def build_agent(sandbox: Path, mode: str = "single", use_skills: bool = False, model=None):
@@ -64,4 +102,19 @@ def build_agent(sandbox: Path, mode: str = "single", use_skills: bool = False, m
     mode không hợp lệ -> ném ValueError.
     Trả về: đồ thị (graph) đã biên dịch, gọi bằng `.invoke({"messages": [...]})`.
     """
-    raise NotImplementedError("TODO 3: cài đặt build_agent (xem guides/pseudocode/01_agent.md)")
+    if mode not in ("single", "subagents"):
+        raise ValueError(f"unknown mode: {mode}")
+    kwargs = {"middleware": [_retry_middleware()]}     # inherited by the general-purpose subagent
+    prompt = BASE_PROMPT
+    if mode == "subagents":
+        kwargs["subagents"] = [
+            {**sub, "system_prompt": sub["system_prompt"] + " " + PATHS_NOTE, "middleware": [_retry_middleware()]}
+            for sub in get_subagents()
+        ]
+        prompt += SUBAGENTS_NOTE
+    if use_skills:
+        kwargs["skills"] = ["/skills/"]
+        prompt += SKILLS_NOTE
+    backend = make_backend(sandbox)
+    return create_deep_agent(model=model or make_model(), tools=[_exec_alias(backend)], system_prompt=prompt,
+                             backend=backend, **kwargs)
