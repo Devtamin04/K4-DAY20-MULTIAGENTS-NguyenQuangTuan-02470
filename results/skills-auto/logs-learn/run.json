@@ -1,0 +1,69 @@
+{
+  "task": "logs-learn",
+  "condition": "skills-auto",
+  "role": "learn",
+  "error": null,
+  "timestamp": "2026-10-06T12:15:26.689512+00:00",
+  "skills_sha256": "4fb0d9dd7f7cf98b104f36b2e48eb26f5b81216d10b3538fcdeb1b8c6323fbeb",
+  "seconds": 29.6,
+  "tokens": {
+    "input": 58070,
+    "output": 1923,
+    "total": 59993
+  },
+  "tool_calls": 8,
+  "subagent_calls": 0,
+  "skills_read": 1,
+  "skills_modified": false,
+  "final_message": "Parsed `workspace/app.log` line‑by‑line, collected extra traceback lines, handled “-- last message repeated N times --” counts, filtered to ERROR/CRITICAL levels, normalized timestamps to UTC, upper‑cased levels, extracted messages and final exception lines, summed repeat counts per service, sorted entries, and wrote the resulting JSON (including `schema_version` 2 and `generated_by` `log‑triage`) to `workspace/errors.json`.",
+  "score": 1.0,
+  "passed": 9,
+  "total": 9,
+  "checks": [
+    {
+      "name": "valid_structure",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "entry_count",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "timestamps_utc",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "exception_fields",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "repeat_counts",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "counts_by_service",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "rule_service_names",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "rule_sorted_errors",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "rule_schema_header",
+      "passed": true,
+      "detail": ""
+    }
+  ]
+}
